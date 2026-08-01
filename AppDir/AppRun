@@ -1,0 +1,4 @@
+#!/bin/bash
+# AppRun - Conky Theme Manager AppImage
+APPDIR="$(dirname "$(readlink -f "$0")")"
+exec python3 "$APPDIR/usr/bin/conky_manager.py" "$@"

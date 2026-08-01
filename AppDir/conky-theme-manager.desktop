@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Conky Theme Manager
+Comment=Gerenciador de temas para Conky
+Exec=conky_manager
+Icon=conky-theme-manager
+Terminal=false
+Categories=Utility;System;
+Keywords=conky;theme;manager;

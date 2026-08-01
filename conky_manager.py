@@ -485,7 +485,8 @@ class ConkyThemeManager:
         btn_frame = ttk.Frame(left, style="Dark.TFrame")
         btn_frame.pack(fill="x", pady=(8, 0))
 
-        ttk.Button(btn_frame, text="+ Novo", style="Accent.TButton", command=self._new_theme).pack(fill="x", pady=(0, 4))
+        ttk.Button(btn_frame, text="▶ Aplicar Tema", style="Accent.TButton", command=self._apply_selected_theme).pack(fill="x", pady=(0, 4))
+        ttk.Button(btn_frame, text="+ Novo", style="Dark.TButton", command=self._new_theme).pack(fill="x", pady=(0, 4))
         ttk.Button(btn_frame, text="Importar .json", style="Dark.TButton", command=self._import_theme).pack(fill="x", pady=(0, 4))
 
         right = ttk.Frame(main, style="Dark.TFrame")
@@ -724,7 +725,8 @@ class ConkyThemeManager:
         data = {}
         for key, widget in self.editor_fields.items():
             if isinstance(widget, tk.Text):
-                data[key] = widget.get("1.0", "end").rstrip()
+                content = widget.get("1.0", "end-1c")
+                data[key] = content
             elif isinstance(widget, tk.IntVar):
                 data[key] = widget.get()
             else:
@@ -846,23 +848,58 @@ class ConkyThemeManager:
             self._select_first()
             self.status_var.set("Tema deletado!")
 
+    def _apply_selected_theme(self):
+        sel = self.theme_listbox.curselection()
+        if not sel:
+            messagebox.showwarning("Aviso", "Selecione um tema primeiro!")
+            return
+
+        name = self.theme_listbox.get(sel[0])
+        theme = load_theme(name)
+        if not theme:
+            messagebox.showerror("Erro", f"Tema '{name}' não encontrado!")
+            return
+
+        content = theme.get("content", "")
+        if not content or not content.strip():
+            font_family = theme.get('font_family', 'JetBrains Mono')
+            title_size = theme.get('title_size', 16)
+            title_text = theme.get('title_text', '${nodename}')
+            theme["content"] = f"${{color1}}${{font {font_family}:bold:size={title_size}}}{title_text}${{font}}${{color}}\n${{color4}}────────────────────${{color}}\n${{color1}}wm:${{color}}     xfwm4\n${{color1}}mem:${{color}}    ${{mem}} / ${{memmax}}\n${{color1}}cpu:${{color}}    ${{cpu cpu0}}%\n${{color4}}────────────────────${{color}}\n${{color3}}${{time %Y-%m-%d}}  ${{time %H:%M}}${{color}}"
+
+        conf = theme_to_conkyrc(theme)
+
+        if CONKYRC.exists():
+            backup = CONKYRC.with_suffix(".rc.backup")
+            shutil.copy2(CONKYRC, backup)
+
+        CONKYRC.write_text(conf)
+
+        try:
+            subprocess.run(["killall", "conky"], capture_output=True)
+        except FileNotFoundError:
+            pass
+
+        import time
+        time.sleep(0.5)
+
+        try:
+            subprocess.Popen(["conky"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.status_var.set(f"Tema '{name}' aplicado com sucesso!")
+            messagebox.showinfo("Sucesso", f"Tema '{name}' aplicado!\nBackup salvo em .conkyrc.backup")
+        except FileNotFoundError:
+            self.status_var.set("Conky não encontrado! Instale o conky.")
+            messagebox.showerror("Erro", "Conky não encontrado no sistema!")
+
     def _apply_theme(self):
         theme = self._gather_theme()
 
-        if theme.get("name") in [p["name"] for p in THEME_PRESETS]:
-            custom_name = theme.get("name")
-        else:
-            custom_name = theme.get("name", "Custom")
-
         content = theme.get("content", "")
-        if not content.strip():
-            theme["content"] = f"""${{color1}}${{font {theme.get('font_family', 'JetBrains Mono')}:bold:size={theme.get('title_size', 16)}}}{theme.get('title_text', '${{nodename}}')}${{font}}${{color}}
-${{color4}}────────────────────${{color}}
-${{color1}}wm:${{color}}     xfwm4
-${{color1}}mem:${{color}}    ${{mem}} / ${{memmax}}
-${{color1}}cpu:${{color}}    ${{cpu cpu0}}%
-${{color4}}────────────────────${{color}}
-${{color3}}${{time %Y-%m-%d}}  ${{time %H:%M}}${{color}}"""
+        if not content or not content.strip():
+            font_family = theme.get('font_family', 'JetBrains Mono')
+            title_size = theme.get('title_size', 16)
+            title_text = theme.get('title_text', '${nodename}')
+            theme["content"] = f"${{color1}}${{font {font_family}:bold:size={title_size}}}{title_text}${{font}}${{color}}\n${{color4}}────────────────────${{color}}\n${{color1}}wm:${{color}}     xfwm4\n${{color1}}mem:${{color}}    ${{mem}} / ${{memmax}}\n${{color1}}cpu:${{color}}    ${{cpu cpu0}}%\n${{color4}}────────────────────${{color}}\n${{color3}}${{time %Y-%m-%d}}  ${{time %H:%M}}${{color}}"
 
         conf = theme_to_conkyrc(theme)
 
